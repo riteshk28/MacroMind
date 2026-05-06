@@ -1,5 +1,4 @@
 import express from 'express';
-import { createServer as createViteServer } from 'vite';
 import { Pool } from 'pg';
 import multer from 'multer';
 import Groq from 'groq-sdk';
@@ -105,6 +104,7 @@ Format: { "mealType": "Breakfast"|"Lunch"|"Dinner"|"Snack", "items": [ { "name":
 
   // Vite Integration for frontend routes
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
