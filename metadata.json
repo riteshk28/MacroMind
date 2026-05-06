@@ -1,0 +1,6 @@
+{
+  "name": "NutriVoice",
+  "description": "AI-powered voice nutrition tracker. Speak what you ate and instantly get calories, macros, and trends using open-source Groq LLMs.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": []
+}
