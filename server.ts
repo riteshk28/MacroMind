@@ -77,7 +77,7 @@ Format: { "mealType": "Breakfast"|"Lunch"|"Dinner"|"Snack", "items": [ { "name":
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-pro',
+        model: 'gemini-2.5-flash',
         contents: [
            { role: 'user', parts: [{ text: SYSTEM_PROMPT + '\n\n' + text }] }
         ],
@@ -253,7 +253,7 @@ Format: { "mealType": "Breakfast"|"Lunch"|"Dinner"|"Snack", "items": [ { "name":
       }`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-pro',
+        model: 'gemini-2.5-flash',
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         config: {
            responseMimeType: 'application/json',
