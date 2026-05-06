@@ -88,7 +88,7 @@ Format: { "mealType": "Breakfast"|"Lunch"|"Dinner"|"Snack", "items": [ { "name":
       if (pool) {
         const { mealType, items, totalCalories, rawText } = req.body;
         const result = await pool.query(
-          \`INSERT INTO logs (meal_type, total_calories, raw_text, items) VALUES ($1, $2, $3, $4) RETURNING *\`,
+          `INSERT INTO logs (meal_type, total_calories, raw_text, items) VALUES ($1, $2, $3, $4) RETURNING *`,
           [mealType, totalCalories, rawText, JSON.stringify(items)]
         );
         res.json(result.rows[0]);
@@ -119,7 +119,7 @@ Format: { "mealType": "Breakfast"|"Lunch"|"Dinner"|"Snack", "items": [ { "name":
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(\`Server running on port \${PORT}\`);
+    console.log(`Server running on port ${PORT}`);
   });
 }
 
