@@ -24,11 +24,30 @@ export interface LoggedMeal {
   rawText: string;
 }
 
+export interface WeightLog {
+  id: string;
+  timestamp: string | number;
+  weight: number;
+}
+
+export interface Profile {
+  age: number;
+  gender: 'male' | 'female';
+  height: number;
+  weight: number;
+  activityLevel: number;
+  goalType: 'lose' | 'maintain' | 'gain';
+}
+
 interface AppState {
   logs: LoggedMeal[];
   setLogs: (logs: LoggedMeal[]) => void;
   addLog: (log: LoggedMeal) => void;
   deleteLog: (id: string) => void;
+  weightLogs: WeightLog[];
+  setWeightLogs: (logs: WeightLog[]) => void;
+  addWeightLog: (log: WeightLog) => void;
+  deleteWeightLog: (id: string) => void;
   goals: {
     calories: number;
     protein: number;
@@ -36,6 +55,8 @@ interface AppState {
     fat: number;
   };
   setGoals: (goals: AppState['goals']) => void;
+  profile: Profile;
+  setProfile: (profile: Partial<Profile>) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -45,6 +66,10 @@ export const useAppStore = create<AppState>()(
       setLogs: (logs) => set({ logs }),
       addLog: (log) => set((state) => ({ logs: [...state.logs, log] })),
       deleteLog: (id) => set((state) => ({ logs: state.logs.filter((l) => l.id !== id) })),
+      weightLogs: [],
+      setWeightLogs: (logs) => set({ weightLogs: logs }),
+      addWeightLog: (log) => set((state) => ({ weightLogs: [...state.weightLogs, log] })),
+      deleteWeightLog: (id) => set((state) => ({ weightLogs: state.weightLogs.filter((l) => l.id !== id) })),
       goals: {
         calories: 2000,
         protein: 150,
@@ -52,6 +77,15 @@ export const useAppStore = create<AppState>()(
         fat: 65,
       },
       setGoals: (goals) => set({ goals }),
+      profile: {
+        age: 30,
+        gender: 'male',
+        height: 175,
+        weight: 70,
+        activityLevel: 1.2,
+        goalType: 'maintain'
+      },
+      setProfile: (profile) => set((state) => ({ profile: { ...state.profile, ...profile } }))
     }),
     {
       name: 'nutrivoice-db',

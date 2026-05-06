@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useAppStore } from '../lib/store';
-import { Mic, Square, Loader2, Save, Trash2, Activity } from 'lucide-react';
+import { Mic, Square, Loader2, Save, Trash2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export function VoiceLogger() {
@@ -120,12 +120,7 @@ export function VoiceLogger() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[70vh] px-4 max-w-lg mx-auto w-full font-sans">
-       <div className="bg-indigo-50 text-indigo-600 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest mb-6 flex items-center gap-2">
-         <Activity className="w-4 h-4" />
-         Groq Whisper AI Active
-       </div>
-       
-       <div className="text-center mb-10">
+       <div className="text-center mb-10 mt-6">
          <h1 className="text-3xl font-bold text-zinc-900">Log your meal</h1>
          <p className="text-zinc-500 font-medium mt-2 text-sm leading-relaxed max-w-xs mx-auto">
            Speak naturally. Our AI tracks state (raw vs cooked) automatically. e.g. "I had 150g cooked chicken breast."

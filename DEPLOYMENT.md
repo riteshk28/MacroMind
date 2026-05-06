@@ -16,6 +16,12 @@ CREATE TABLE logs (
     raw_text TEXT NOT NULL,
     items JSONB NOT NULL
 );
+
+CREATE TABLE weight_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    weight NUMERIC(5,2) NOT NULL
+);
 \`\`\`
 
 3. Go to the **Dashboard** and copy your Postgres Connection String.

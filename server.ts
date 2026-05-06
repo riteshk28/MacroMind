@@ -35,23 +35,33 @@ async function startServer() {
 
   // 1. Convert Audio to Text using Whisper
   app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
+    let tempFilePath = '';
     try {
       if (!process.env.GROQ_API_KEY) {
         return res.status(400).json({ error: "GROQ_API_KEY not configured on server" });
       }
       if (!req.file) return res.status(400).json({ error: "No audio file provided" });
 
+      const extension = req.file.originalname.split('.').pop() || 'webm';
+      tempFilePath = req.file.path + '.' + extension;
+      fs.renameSync(req.file.path, tempFilePath);
+
       const transcription = await groq.audio.transcriptions.create({
-        file: fs.createReadStream(req.file.path),
+        file: fs.createReadStream(tempFilePath),
         model: "whisper-large-v3",
         response_format: "json",
       });
 
-      fs.unlinkSync(req.file.path); // cleanup
+      fs.unlinkSync(tempFilePath); // cleanup
       res.json({ text: transcription.text });
     } catch (e: any) {
       console.error(e);
-      if (req.file) fs.unlinkSync(req.file.path).catch(() => {});
+      if (tempFilePath) {
+         try { fs.unlinkSync(tempFilePath); } catch(_) {}
+      }
+      if (req.file && req.file.path) {
+         try { fs.unlinkSync(req.file.path); } catch(_) {}
+      }
       res.status(500).json({ error: e.message || "Transcription failed" });
     }
   });
@@ -90,7 +100,15 @@ Format: { "mealType": "Breakfast"|"Lunch"|"Dinner"|"Snack", "items": [ { "name":
           `INSERT INTO logs (meal_type, total_calories, raw_text, items) VALUES ($1, $2, $3, $4) RETURNING *`,
           [mealType, totalCalories, rawText, JSON.stringify(items)]
         );
-        res.json(result.rows[0]);
+        const row = result.rows[0];
+        res.json({
+          id: row.id,
+          timestamp: row.timestamp,
+          mealType: row.meal_type,
+          totalCalories: row.total_calories,
+          rawText: row.raw_text,
+          items: typeof row.items === 'string' ? JSON.parse(row.items) : row.items
+        });
       } else {
         const log = { id: Date.now().toString(), timestamp: new Date().toISOString(), ...req.body };
         memoryDB.push(log);
@@ -99,6 +117,103 @@ Format: { "mealType": "Breakfast"|"Lunch"|"Dinner"|"Snack", "items": [ { "name":
     } catch (e) {
       console.error(e);
       res.status(500).json({ error: "Failed to save log" });
+    }
+  });
+
+  // 4. Delete Log
+  app.delete('/api/logs/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      if (pool) {
+        await pool.query(`DELETE FROM logs WHERE id = $1`, [id]);
+        res.json({ success: true });
+      } else {
+        const index = memoryDB.findIndex(l => l.id === id);
+        if (index > -1) memoryDB.splice(index, 1);
+        res.json({ success: true });
+      }
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Failed to delete log" });
+    }
+  });
+
+  // 5. Get Logs
+  app.get('/api/logs', async (req, res) => {
+    try {
+      if (pool) {
+        const result = await pool.query(`SELECT * FROM logs ORDER BY timestamp DESC LIMIT 200`);
+        const logs = result.rows.map(row => ({
+          id: row.id,
+          timestamp: row.timestamp,
+          mealType: row.meal_type,
+          totalCalories: row.total_calories,
+          rawText: row.raw_text,
+          items: typeof row.items === 'string' ? JSON.parse(row.items) : row.items
+        }));
+        res.json(logs);
+      } else {
+        res.json(memoryDB);
+      }
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Failed to fetch logs" });
+    }
+  });
+
+  const memoryWeightDB: any[] = [];
+
+  // 6. Save Weight
+  app.post('/api/weight', async (req, res) => {
+    try {
+      const { weight } = req.body;
+      if (pool) {
+        const result = await pool.query(
+          `INSERT INTO weight_logs (weight) VALUES ($1) RETURNING *`,
+          [weight]
+        );
+        res.json(result.rows[0]);
+      } else {
+        const log = { id: Date.now().toString(), timestamp: new Date().toISOString(), weight };
+        memoryWeightDB.push(log);
+        res.json(log);
+      }
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Failed to save weight" });
+    }
+  });
+
+  // 7. Get Weight Logs
+  app.get('/api/weight', async (req, res) => {
+    try {
+      if (pool) {
+        const result = await pool.query(`SELECT * FROM weight_logs ORDER BY timestamp ASC`);
+        res.json(result.rows);
+      } else {
+        res.json(memoryWeightDB);
+      }
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Failed to fetch weight logs" });
+    }
+  });
+
+  // 8. Delete Weight Log
+  app.delete('/api/weight/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      if (pool) {
+        await pool.query(`DELETE FROM weight_logs WHERE id = $1`, [id]);
+        res.json({ success: true });
+      } else {
+        const index = memoryWeightDB.findIndex(l => l.id === id);
+        if (index > -1) memoryWeightDB.splice(index, 1);
+        res.json({ success: true });
+      }
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Failed to delete weight log" });
     }
   });
 

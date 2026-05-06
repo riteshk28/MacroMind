@@ -1,24 +1,40 @@
 import { isToday, isSameDay } from 'date-fns';
 import { useAppStore } from '../lib/store';
 import { ProgressRing } from './ProgressRing';
-import { Activity } from 'lucide-react';
+import { Activity, Trash2, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 
 export function Dashboard() {
-  const { logs, goals } = useAppStore();
+  const { logs, goals, deleteLog } = useAppStore();
   const [expandedLog, setExpandedLog] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
   // Filter logs for today
   const todayLogs = logs.filter(log => isToday(new Date(log.timestamp)));
 
+  const handleDeleteLog = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this log?")) return;
+    setIsDeleting(id);
+    try {
+      const res = await fetch(`/api/logs/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        deleteLog(id);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsDeleting(null);
+    }
+  };
+
   // Calculate totals
   const totals = todayLogs.reduce((acc, log) => {
     log.items.forEach(item => {
-      acc.calories += item.calories;
-      acc.protein += item.protein;
-      acc.carbs += item.carbs;
-      acc.fat += item.fat;
-      acc.fiber += item.fiber;
+      acc.calories += item.calories || 0;
+      acc.protein += item.protein || 0;
+      acc.carbs += item.carbs || 0;
+      acc.fat += item.fat || 0;
+      acc.fiber += item.fiber || 0;
     });
     return acc;
   }, { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 });
@@ -32,12 +48,6 @@ export function Dashboard() {
           <p className="text-zinc-500 font-medium">
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} • Daily Nutrition Dashboard
           </p>
-        </div>
-        <div className="flex gap-3">
-          <div className="bg-white border border-zinc-200 px-4 py-2 rounded-2xl flex items-center gap-2 shadow-sm">
-            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-            <span className="text-sm font-semibold text-zinc-700">AI Sync: Active</span>
-          </div>
         </div>
       </header>
 
@@ -92,8 +102,7 @@ export function Dashboard() {
         {/* Recent AI Logs */}
         <div className="md:col-span-4 md:row-span-4 bg-white rounded-[32px] p-6 shadow-sm border border-zinc-100 flex flex-col max-h-[500px]">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="font-bold text-lg">Recent AI Logs</h3>
-            <span className="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-tighter">Verified by Groq</span>
+            <h3 className="font-bold text-lg">Recent Meals</h3>
           </div>
           
           <div className="flex-1 overflow-y-auto space-y-4 pr-2">
@@ -104,9 +113,22 @@ export function Dashboard() {
               </div>
             ) : (
               todayLogs.map(log => (
-                <div key={log.id} className="space-y-2">
+                <div key={log.id} className="space-y-2 relative group mb-6">
+                  <div className="flex justify-between items-center px-1 mb-2">
+                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest pl-2">
+                      {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    <button 
+                      onClick={() => handleDeleteLog(log.id)}
+                      disabled={isDeleting === log.id}
+                      className="text-zinc-300 hover:text-rose-500 transition-colors p-1 rounded hover:bg-rose-50"
+                      title="Delete Entry"
+                    >
+                      {isDeleting === log.id ? <Loader2 className="w-4 h-4 animate-spin text-rose-500" /> : <Trash2 className="w-4 h-4" />}
+                    </button>
+                  </div>
                   {log.items.map((item, idx) => (
-                    <div key={idx} className="flex flex-col p-4 bg-zinc-50 rounded-2xl w-full">
+                    <div key={idx} className="flex flex-col p-4 bg-zinc-50 rounded-2xl w-full border border-transparent hover:border-zinc-200 transition-colors">
                       <div className="flex items-start gap-4">
                         <div className="bg-orange-100 text-orange-600 p-2 rounded-xl mt-1 shrink-0">
                           <Activity className="w-5 h-5" />
