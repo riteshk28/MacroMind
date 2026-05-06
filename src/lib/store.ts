@@ -36,7 +36,9 @@ export interface Profile {
   height: number;
   weight: number;
   activityLevel: number;
-  goalType: 'lose' | 'maintain' | 'gain';
+  targetPace: string;
+  dietPreference: string;
+  activityNotes: string;
 }
 
 interface AppState {
@@ -83,7 +85,9 @@ export const useAppStore = create<AppState>()(
         height: 175,
         weight: 70,
         activityLevel: 1.2,
-        goalType: 'maintain'
+        targetPace: 'maintain',
+        dietPreference: 'balanced',
+        activityNotes: ''
       },
       setProfile: (profile) => set((state) => ({ profile: { ...state.profile, ...profile } }))
     }),

@@ -66,24 +66,28 @@ async function startServer() {
     }
   });
 
-  // 2. Parse Text to Nutrition JSON
+  // 2. Parse Text to Nutrition JSON using Gemini
   app.post('/api/parse', async (req, res) => {
     try {
       const { text } = req.body;
-      const SYSTEM_PROMPT = `You are an AI nutritionist. User dictation: extract ALL food, estimate nutritional values exactly formatting as JSON.
+      const SYSTEM_PROMPT = `You are an expert AI nutritionist. User dictation: extract ALL food, estimate nutritional values exactly formatting as JSON. Carefully consider the state of the food (e.g. cooked vs raw) as it dramatically changes the weight-to-calorie ratio. E.g. 150g of cooked chicken breast is ~248 calories and ~46g protein.
 Format: { "mealType": "Breakfast"|"Lunch"|"Dinner"|"Snack", "items": [ { "name": "", "amount": 100, "unit": "g", "calories": 0, "protein": 0, "carbs": 0, "fat": 0, "fiber": 0, "micronutrients": {"Iron":"10%"} } ]}`;
 
-      const chatCompletion = await groq.chat.completions.create({
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: text }
+      const { GoogleGenAI } = await import('@google/genai');
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-pro',
+        contents: [
+           { role: 'user', parts: [{ text: SYSTEM_PROMPT + '\n\n' + text }] }
         ],
-        model: 'llama-3.3-70b-versatile',
-        temperature: 0.1,
-        response_format: { type: 'json_object' },
+        config: {
+           responseMimeType: 'application/json',
+           temperature: 0.1
+        }
       });
 
-      const parsed = JSON.parse(chatCompletion.choices[0]?.message?.content || '{}');
+      const parsed = JSON.parse(response.text || '{}');
       res.json(parsed);
     } catch (e: any) {
       console.error(e);
@@ -214,6 +218,54 @@ Format: { "mealType": "Breakfast"|"Lunch"|"Dinner"|"Snack", "items": [ { "name":
     } catch (e) {
       console.error(e);
       res.status(500).json({ error: "Failed to delete weight log" });
+    }
+  });
+
+  // 9. Calculate Macros with Gemini
+  app.post('/api/calculate-macros', async (req, res) => {
+    try {
+      const { profile } = req.body;
+      const { GoogleGenAI } = await import('@google/genai');
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+      const prompt = `You are a world-class sports nutritionist. Based on the following user profile, calculate their optimal Exact Target Calories (TDEE adjusted for goal) and Macronutrients (Protein, Carbs, Fat in grams).
+
+      Profile:
+      - Age: ${profile.age}
+      - Gender: ${profile.gender}
+      - Height: ${profile.height} cm
+      - Weight: ${profile.weight} kg
+      - Activity Level Factor: ${profile.activityLevel} (1.2 sedentary -> 1.7+ highly active)
+      - Weekly Goal Pace: ${profile.targetPace}
+      - Diet Preference: ${profile.dietPreference}
+      - Custom Notes: ${profile.activityNotes || 'None'}
+
+      Please calculate their BMR (e.g. Mifflin-St Jeor), multiply by activity level to get TDEE, and apply the exact deficit/surplus based on their goal pace.
+      Split macros based on their diet preference (e.g. Keto is low carb high fat, High Protein is very high protein, Balanced is 30/40/30). Ensure adequate protein for muscle maintenance.
+      
+      IMPORTANT: Return ONLY a valid JSON object matching this schema exactly:
+      {
+        "calories": 2000,
+        "protein": 150,
+        "carbs": 200,
+        "fat": 65,
+        "explanation": "Brief 2-sentence explanation of calculation and approach."
+      }`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-pro',
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        config: {
+           responseMimeType: 'application/json',
+           temperature: 0.1
+        }
+      });
+
+      const parsed = JSON.parse(response.text || '{}');
+      res.json(parsed);
+    } catch (e: any) {
+      console.error('Macro calculation error:', e);
+      res.status(500).json({ error: 'Failed to calculate macros via AI' });
     }
   });
 

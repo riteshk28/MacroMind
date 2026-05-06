@@ -76,14 +76,10 @@ export function Dashboard() {
               </div>
             </ProgressRing>
           </div>
-          <div className="mt-8 grid grid-cols-2 gap-8 w-full">
-            <div className="text-center border-r border-zinc-100">
-              <p className="text-zinc-400 text-xs font-bold">BURNED</p>
-              <p className="text-xl font-bold">0</p>
-            </div>
+          <div className="mt-8 flex justify-center w-full">
             <div className="text-center">
-              <p className="text-zinc-400 text-xs font-bold">REMAINING</p>
-              <p className="text-xl font-bold">{Math.max(goals.calories - Math.round(totals.calories), 0)}</p>
+               <p className="text-zinc-400 text-xs font-bold">REMAINING</p>
+               <p className="text-xl font-bold">{Math.max(goals.calories - Math.round(totals.calories), 0)}</p>
             </div>
           </div>
         </div>

@@ -1,8 +1,11 @@
 import { useAppStore } from '../lib/store';
-import { Target, UserRound } from 'lucide-react';
+import { Target, UserRound, Sparkles, Loader2 } from 'lucide-react';
+import { useState } from 'react';
 
 export function Settings() {
   const { goals, setGoals, logs, profile, setProfile } = useAppStore();
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [aiExplanation, setAiExplanation] = useState('');
 
   const handleSaveGoals = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -24,36 +27,40 @@ export function Settings() {
       height: Number(formData.get('height')),
       weight: Number(formData.get('weight')),
       activityLevel: Number(formData.get('activityLevel')),
-      goalType: formData.get('goalType') as 'lose' | 'maintain' | 'gain',
+      targetPace: formData.get('targetPace') as string,
+      dietPreference: formData.get('dietPreference') as string,
+      activityNotes: formData.get('activityNotes') as string,
     });
+    alert('Profile saved!');
   };
 
-  const calculateTDEE = () => {
-    const { weight, height, age, gender, activityLevel, goalType } = profile;
-    let bmr = (10 * weight) + (6.25 * height) - (5 * age);
-    bmr += gender === 'male' ? 5 : -161;
-    let tdee = bmr * activityLevel;
-    
-    if (goalType === 'lose') tdee -= 500;
-    if (goalType === 'gain') tdee += 500;
-
-    return Math.round(tdee);
-  };
-
-  const applyCalculatedGoals = () => {
-    const tdee = calculateTDEE();
-    // Standard macro split: 30% protein, 40% carbs, 30% fat
-    const protein = Math.round((tdee * 0.3) / 4); // 4 kcal per gram
-    const carbs = Math.round((tdee * 0.4) / 4);   // 4 kcal per gram
-    const fat = Math.round((tdee * 0.3) / 9);     // 9 kcal per gram
-
-    setGoals({
-      calories: tdee,
-      protein,
-      carbs,
-      fat,
-    });
-    alert('Goals updated based on your profile!');
+  const generateAIGoals = async () => {
+    setIsCalculating(true);
+    setAiExplanation('');
+    try {
+      const res = await fetch('/api/calculate-macros', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile }),
+      });
+      const data = await res.json();
+      if (data.calories) {
+        setGoals({
+          calories: Math.round(data.calories),
+          protein: Math.round(data.protein),
+          carbs: Math.round(data.carbs),
+          fat: Math.round(data.fat),
+        });
+        setAiExplanation(data.explanation || 'Goals calculated successfully!');
+      } else {
+        alert('Could not determine goals from AI response.');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Failed to calculate goals via AI');
+    } finally {
+      setIsCalculating(false);
+    }
   };
 
   return (
@@ -90,39 +97,60 @@ export function Settings() {
                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Weight (kg)</label>
                <input name="weight" type="number" defaultValue={profile.weight} step="0.1" className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 text-zinc-900" />
              </div>
-             <div>
+             <div className="col-span-2">
                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Activity Level</label>
                <select name="activityLevel" defaultValue={profile.activityLevel} className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 text-zinc-900">
-                 <option value="1.2">Sedentary (Office job)</option>
-                 <option value="1.375">Lightly Active (1-3 days/wk)</option>
-                 <option value="1.55">Moderately Active (3-5 days/wk)</option>
-                 <option value="1.725">Very Active (6-7 days/wk)</option>
+                 <option value="1.2">Sedentary (Office job, little to no exercise)</option>
+                 <option value="1.375">Lightly Active (Light exercise 1-3 days/wk)</option>
+                 <option value="1.55">Moderately Active (Moderate exercise 3-5 days/wk)</option>
+                 <option value="1.725">Very Active (Heavy exercise 6-7 days/wk)</option>
                </select>
              </div>
-             <div>
-               <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Target Goal</label>
-               <select name="goalType" defaultValue={profile.goalType} className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 text-zinc-900">
-                 <option value="lose">Lose Weight</option>
+             
+             <div className="col-span-2 mt-2">
+               <h3 className="text-sm font-bold text-zinc-900 mb-4 border-b border-zinc-100 pb-2">Target & Habits</h3>
+             </div>
+
+             <div className="col-span-2 sm:col-span-1">
+               <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Pace</label>
+               <select name="targetPace" defaultValue={profile.targetPace || 'maintain'} className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 text-zinc-900">
+                 <option value="lose_1.0">Lose 1.0 kg / week (Aggressive)</option>
+                 <option value="lose_0.5">Lose 0.5 kg / week</option>
+                 <option value="lose_0.25">Lose 0.25 kg / week</option>
                  <option value="maintain">Maintain Weight</option>
-                 <option value="gain">Gain Muscle</option>
+                 <option value="gain_0.25">Gain 0.25 kg / week (Lean Bulk)</option>
+                 <option value="gain_0.5">Gain 0.5 kg / week</option>
                </select>
+             </div>
+             <div className="col-span-2 sm:col-span-1">
+               <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Diet Type</label>
+               <select name="dietPreference" defaultValue={profile.dietPreference || 'balanced'} className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 text-zinc-900">
+                 <option value="balanced">Balanced</option>
+                 <option value="high_protein">High Protein</option>
+                 <option value="low_carb">Low Carb</option>
+                 <option value="keto">Ketogenic</option>
+               </select>
+             </div>
+             <div className="col-span-2">
+               <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Exercise Routine / Notes (Optional)</label>
+               <textarea name="activityNotes" defaultValue={profile.activityNotes || ''} placeholder="e.g. I run 5k three times a week and lift weights twice a week." className="w-full min-h-[80px] bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 text-zinc-900 resize-none" />
              </div>
           </div>
           
-          <div className="flex flex-col gap-3 mt-6 pt-4 border-t border-zinc-100">
-            <div className="flex justify-between items-center text-sm font-medium">
-               <span className="text-zinc-500">Estimated Target Calories:</span>
-               <span className="font-bold text-indigo-600 text-lg">{calculateTDEE()} kcal</span>
-            </div>
-            
-            <div className="flex gap-2 w-full mt-2">
-              <button type="submit" className="flex-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-900 py-3 rounded-xl font-bold text-sm transition-colors">
-                Save Profile
-              </button>
-              <button type="button" onClick={applyCalculatedGoals} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold text-sm transition-colors">
-                Apply to Goals
-              </button>
-            </div>
+          <div className="flex flex-col mt-6 pt-4 border-t border-zinc-100">
+            <button type="submit" className="w-full bg-zinc-100 hover:bg-zinc-200 text-zinc-900 py-3 rounded-xl font-bold text-sm transition-colors">
+              Save Profile First
+            </button>
+            <button type="button" onClick={generateAIGoals} disabled={isCalculating} className="mt-3 flex items-center justify-center gap-2 w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white py-3 rounded-xl font-bold text-sm transition-colors">
+              {isCalculating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+              {isCalculating ? 'Calculating optimal macros...' : 'Calculate Goals with Gemini'}
+            </button>
+            {aiExplanation && (
+              <div className="mt-4 p-4 bg-indigo-50 rounded-xl text-sm text-indigo-800 border border-indigo-100">
+                <p className="font-medium">{aiExplanation}</p>
+                <p className="text-xs text-indigo-500 mt-2">Daily Goals overridden below.</p>
+              </div>
+            )}
           </div>
         </form>
       </section>
