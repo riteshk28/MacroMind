@@ -53,12 +53,22 @@ export function Trends() {
   const maxCalories = Math.max(goals.calories, ...weekDays.map(d => d.calories));
 
   // Process Weight Logs for chart
-  // Sort weight logs and format for LineChart
-  const sortedWeightLogs = [...weightLogs].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-  const formattedWeightLogs = sortedWeightLogs.map(log => ({
+  // Group by day, taking the latest weight for each day
+  const groupedWeightLogs = weightLogs.reduce((acc, log) => {
+    const dateKey = format(new Date(log.timestamp), 'MMM d');
+    // since we reduce, we can overwrite with the newest if we sort first
+    acc[dateKey] = log;
+    return acc;
+  }, {} as Record<string, typeof weightLogs[0]>);
+
+  const sortedGroupedLogs = Object.values(groupedWeightLogs).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  
+  const chartWeightLogs = sortedGroupedLogs.map(log => ({
     ...log,
     formattedDate: format(new Date(log.timestamp), 'MMM d'),
   }));
+
+  const sortedAllLogsForList = [...weightLogs].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
   const handleLogWeight = async () => {
     if (!weightInput) return;
@@ -208,11 +218,11 @@ export function Trends() {
           </div>
         )}
 
-        {formattedWeightLogs.length > 0 ? (
+        {chartWeightLogs.length > 0 ? (
           <div className="w-full h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={formattedWeightLogs} margin={{ left: -20, bottom: 20 }}>
-                <YAxis domain={['auto', 'auto']} tick={{ fontSize: 12, fill: '#A1A1AA', fontWeight: 'bold' }} axisLine={false} tickLine={false} />
+              <LineChart data={chartWeightLogs} margin={{ left: 0, right: 10, bottom: 20, top: 10 }}>
+                <YAxis width={35} domain={['auto', 'auto']} tick={{ fontSize: 12, fill: '#A1A1AA', fontWeight: 'bold' }} axisLine={false} tickLine={false} />
                 <Tooltip 
                   cursor={{stroke: '#E0E7FF', strokeWidth: 2}}
                   content={({ active, payload }) => {
@@ -233,11 +243,11 @@ export function Trends() {
             
             {/* List history underneath chart */}
             <div className="mt-4 flex flex-col gap-2 max-h-40 overflow-y-auto">
-              {[...formattedWeightLogs].reverse().map(log => (
+              {sortedAllLogsForList.map(log => (
                  <div key={log.id} className="flex justify-between items-center bg-zinc-50 rounded-xl px-4 py-2">
                    <div className="flex flex-col">
                      <span className="font-bold text-sm text-zinc-900">{log.weight} kg</span>
-                     <span className="text-xs text-zinc-400">{log.formattedDate}</span>
+                     <span className="text-xs text-zinc-400">{format(new Date(log.timestamp), 'MMM d, h:mm a')}</span>
                    </div>
                    <button onClick={() => handleDeleteWeight(log.id)} className="text-zinc-300 hover:text-rose-500 p-1">
                      <Trash2 className="w-4 h-4" />
