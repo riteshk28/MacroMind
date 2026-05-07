@@ -1,29 +1,49 @@
 import { useAppStore } from '../lib/store';
-import { format, subDays, startOfDay, isSameDay } from 'date-fns';
-import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, LineChart, Line, YAxis } from 'recharts';
+import { format, subDays, startOfDay, isSameDay, startOfWeek, subWeeks, addDays, isFuture } from 'date-fns';
+import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, LineChart, Line, YAxis, ReferenceLine } from 'recharts';
 import { useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export function Trends() {
-  const { logs, goals, weightLogs, addWeightLog, deleteWeightLog } = useAppStore();
+  const { logs, goals, weightLogs, addWeightLog, deleteWeightLog, profile } = useAppStore();
   const [showWeightInput, setShowWeightInput] = useState(false);
   const [weightInput, setWeightInput] = useState('');
+  const [weekOffset, setWeekOffset] = useState(0);
 
-  // Generate last 7 days data for calories
-  const last7Days = Array.from({ length: 7 }).map((_, i) => {
-    const date = startOfDay(subDays(new Date(), 6 - i));
+  // Calculate maintenance calories (TDEE)
+  const { weight: pWeight, height, age, gender, activityLevel } = profile;
+  let bmr = (10 * pWeight) + (6.25 * height) - (5 * age);
+  bmr += gender === 'male' ? 5 : -161;
+  const maintenanceCals = Math.round(bmr * activityLevel);
+
+  // Generate Mon-Sun data for the selected week
+  const baseDate = subWeeks(new Date(), weekOffset);
+  const startOfSelectedWeek = startOfWeek(baseDate, { weekStartsOn: 1 }); // Monday
+
+  const weekDays = Array.from({ length: 7 }).map((_, i) => {
+    const date = startOfDay(addDays(startOfSelectedWeek, i));
     const dayLogs = logs.filter(l => isSameDay(new Date(l.timestamp), date));
     const cals = dayLogs.reduce((sum, l) => sum + ((l.totalCalories ?? (l as any).total_calories ?? 0)), 0);
+    const isToday = isSameDay(date, new Date());
     
     return {
       name: format(date, 'EEE'),
       fullDate: format(date, 'MMM d'),
       calories: Math.round(cals),
-      isToday: i === 6
+      isToday,
+      isFuture: isFuture(date) && !isToday
     };
   });
 
-  const averageCals = last7Days.reduce((sum, day) => sum + day.calories, 0) / 7;
+  // Weekly accumulated deficit
+  // Sum of (Maintenance - Consumed) for all days up to today (or all days in past weeks)
+  const accumulatedDeficit = weekDays.reduce((sum, day) => {
+    if (day.isFuture) return sum; 
+    // If no calories logged and it's not today, assume 0 or maybe assume maintenance?
+    // Let's assume if calories are 0 for a past day, it might be unlogged, but we'll stick to math.
+    const dayDeficit = maintenanceCals - day.calories;
+    return sum + dayDeficit;
+  }, 0);
 
   // Process Weight Logs for chart
   // Sort weight logs and format for LineChart
@@ -66,16 +86,38 @@ export function Trends() {
 
   return (
     <div className="flex flex-col space-y-6 pb-24 px-4 pt-6 max-w-2xl mx-auto w-full font-sans text-zinc-900">
-      <header>
-        <h1 className="text-3xl font-bold tracking-tight text-zinc-900">Trends</h1>
-        <p className="text-sm text-zinc-500 font-medium mt-1">Last 7 Days</p>
+      <header className="flex justify-between items-end">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-zinc-900">Trends</h1>
+          <p className="text-sm text-zinc-500 font-medium mt-1">Weekly Snapshot</p>
+        </div>
+        <div className="flex items-center gap-2 mb-1">
+          <button 
+            onClick={() => setWeekOffset(o => o + 1)}
+            className="p-2 bg-white border border-zinc-100 shadow-sm rounded-full text-zinc-600 hover:text-indigo-600 transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <span className="text-xs font-bold w-20 text-center text-zinc-400 uppercase tracking-widest">
+            {weekOffset === 0 ? 'This Wk' : weekOffset === 1 ? 'Last Wk' : `${weekOffset} Wks Ago`}
+          </span>
+          <button 
+            onClick={() => setWeekOffset(o => Math.max(0, o - 1))}
+            disabled={weekOffset === 0}
+            className="p-2 bg-white border border-zinc-100 shadow-sm rounded-full text-zinc-600 hover:text-indigo-600 disabled:opacity-30 transition-colors"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
       </header>
 
       {/* Average Card */}
       <div className="bg-white rounded-[32px] p-8 shadow-sm border border-zinc-100 flex justify-between items-center">
          <div>
-           <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1">Weekly Average</p>
-           <p className="text-4xl font-black text-zinc-900">{Math.round(averageCals)} <span className="text-xl font-bold text-zinc-400">kcal</span></p>
+           <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1">Weekly Accum. Deficit</p>
+           <p className="text-4xl font-black text-zinc-900">
+             {accumulatedDeficit > 0 ? '+' : ''}{Math.round(accumulatedDeficit)} <span className="text-xl font-bold text-zinc-400">kcal</span>
+           </p>
          </div>
       </div>
 
@@ -83,7 +125,7 @@ export function Trends() {
       <div className="bg-white rounded-[32px] p-8 shadow-sm border border-zinc-100 h-96">
         <h3 className="font-bold text-lg text-zinc-900 mb-8">Calories</h3>
         <ResponsiveContainer width="100%" height="80%">
-          <BarChart data={last7Days}>
+          <BarChart data={weekDays}>
             <XAxis 
               dataKey="name" 
               axisLine={false} 
@@ -105,8 +147,9 @@ export function Trends() {
                 return null;
               }}
             />
+            <ReferenceLine y={goals.calories} stroke="#A1A1AA" strokeDasharray="3 3" />
             <Bar dataKey="calories" radius={[6, 6, 6, 6]}>
-              {last7Days.map((entry, index) => (
+              {weekDays.map((entry, index) => (
                 <Cell 
                   key={`cell-${index}`} 
                   fill={entry.isToday ? '#6366F1' : (entry.calories > goals.calories ? '#F43F5E' : '#E4E4E7')} 
