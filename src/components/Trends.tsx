@@ -39,11 +39,16 @@ export function Trends() {
   // Sum of (Maintenance - Consumed) for all days up to today (or all days in past weeks)
   const accumulatedDeficit = weekDays.reduce((sum, day) => {
     if (day.isFuture) return sum; 
-    // If no calories logged and it's not today, assume 0 or maybe assume maintenance?
-    // Let's assume if calories are 0 for a past day, it might be unlogged, but we'll stick to math.
-    const dayDeficit = maintenanceCals - day.calories;
-    return sum + dayDeficit;
+    // Only calculate deficit for days with actual logged calories
+    if (day.calories > 0) {
+      const dayDeficit = maintenanceCals - day.calories;
+      return sum + dayDeficit;
+    }
+    return sum;
   }, 0);
+
+  // Determine max value for Y-axis to ensure ReferenceLine shows up
+  const maxCalories = Math.max(goals.calories, ...weekDays.map(d => d.calories));
 
   // Process Weight Logs for chart
   // Sort weight logs and format for LineChart
@@ -126,6 +131,7 @@ export function Trends() {
         <h3 className="font-bold text-lg text-zinc-900 mb-8">Calories</h3>
         <ResponsiveContainer width="100%" height="80%">
           <BarChart data={weekDays}>
+            <YAxis hide domain={[0, maxCalories >= 100 ? maxCalories * 1.1 : 2500]} />
             <XAxis 
               dataKey="name" 
               axisLine={false} 
