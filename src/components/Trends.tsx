@@ -35,17 +35,19 @@ export function Trends() {
     };
   });
 
-  // Weekly accumulated deficit
-  // Sum of (Maintenance - Consumed) for all days up to today (or all days in past weeks)
-  const accumulatedDeficit = weekDays.reduce((sum, day) => {
+  // Weekly accumulated balance
+  // Sum of (Consumed - Maintenance) for days with logged calories
+  const accumulatedBalance = weekDays.reduce((sum, day) => {
     if (day.isFuture) return sum; 
-    // Only calculate deficit for days with actual logged calories
+    // Only calculate balance for days with actual logged calories
     if (day.calories > 0) {
-      const dayDeficit = maintenanceCals - day.calories;
-      return sum + dayDeficit;
+      const dayBalance = day.calories - maintenanceCals;
+      return sum + dayBalance;
     }
     return sum;
   }, 0);
+
+  const balanceColor = accumulatedBalance > 0 ? 'text-rose-500' : (accumulatedBalance < 0 ? 'text-emerald-500' : 'text-zinc-900');
 
   // Determine max value for Y-axis to ensure ReferenceLine shows up
   const maxCalories = Math.max(goals.calories, ...weekDays.map(d => d.calories));
@@ -119,9 +121,9 @@ export function Trends() {
       {/* Average Card */}
       <div className="bg-white rounded-[32px] p-8 shadow-sm border border-zinc-100 flex justify-between items-center">
          <div>
-           <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1">Weekly Accum. Deficit</p>
-           <p className="text-4xl font-black text-zinc-900">
-             {accumulatedDeficit > 0 ? '+' : ''}{Math.round(accumulatedDeficit)} <span className="text-xl font-bold text-zinc-400">kcal</span>
+           <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1">Weekly Accum. Balance</p>
+           <p className={`text-4xl font-black ${balanceColor}`}>
+             {accumulatedBalance > 0 ? '+' : ''}{Math.round(accumulatedBalance)} <span className="text-xl font-bold text-zinc-400">kcal</span>
            </p>
          </div>
       </div>
